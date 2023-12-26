@@ -20,11 +20,10 @@ const options = {
     definition: {
       openapi: '3.0.0',
       info: {
-        title: 'WJ BENR3433 INFORMATION SECURITY assignment',
+        title: 'WJ BENR3433 INFORMATION SECURITY assignment G15',
         version: '1.0.0',
       },
       tags:[
-        { name: 'default', description: 'Default endpoints' },
         { name: 'test', description: 'testing endpoints' },
         { name: 'User', description: 'Endpoints related to users' },
         { name: 'Visitor', description: 'Endpoints related to visitor' },

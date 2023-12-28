@@ -43,8 +43,9 @@ const options = {
         },
       servers:[
         {
-            url: 'https://benr3433-information-security-assignment.azurewebsites.net/'
-            //url: 'http://localhost:3000'
+            //url: 'https://benr3433-information-security-assignment.azurewebsites.net/'
+            //remember to change current ip address in MongoDB Network Access List
+            url: 'http://localhost:3000'
         }
       ]
     },

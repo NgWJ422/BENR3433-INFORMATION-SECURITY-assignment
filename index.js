@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express')
 const bcrypt = require('bcrypt');
 const mongoose = require('mongoose')
@@ -11,7 +12,7 @@ const swaggerUi = require('swagger-ui-express');
 
 
 const port = process.env.PORT || 3000;
-const JWT_SECRET='12bob12ou2b1ob';
+
 
 
 app.use(express.json())
@@ -21,6 +22,7 @@ const options = {
       openapi: '3.0.0',
       info: {
         title: 'WJ BENR3433 INFORMATION SECURITY assignment G15',
+        description:'Ng Wei Jie  B022110102 Chan Zen Yang  B022110113',
         version: '1.0.0',
       },
       tags:[
@@ -57,7 +59,7 @@ const options = {
   app.use('/swagger', swaggerUi.serve, swaggerUi.setup(openapiSpecification));
 
 
-mongoose.connect('mongodb+srv://jng010422:7NVCOJQwL6do3rXn@cluster0.junlsj6.mongodb.net/WJ_VMS')
+mongoose.connect(process.env.mongo_url)
  .then(()=>{
      console.log('connected to mongodb')
      app.listen(port,() => {
@@ -161,7 +163,7 @@ app.post('/login', async (req, res) => {
     await User.updateOne({ username }, { $set: { login_status: true } });
 
     // Generate JWT token
-    const accessToken = jwt.sign({ username: user.username, user_id: user._id }, JWT_SECRET);
+    const accessToken = jwt.sign({ username: user.username, user_id: user._id }, process.env.JWT_SECRET);
     if(user.role == 'admin' ){
       const allUsers = await User.find();
       const allVisitors = await Visitor.find();
@@ -190,7 +192,7 @@ function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1]
   if (token == null) return res.sendStatus(401)
 
-  jwt.verify(token, JWT_SECRET, (err, login_user) => {
+  jwt.verify(token, process.env.JWT_SECRET, (err, login_user) => {
     console.log(err)
     if (err) return res.sendStatus(403)
     req.user = login_user
@@ -500,6 +502,42 @@ app.get('/read/visitor_pass/:id', authenticateToken, async (req, res) => {
   }
 });
 
+
+//retrieve phone number from visitor pass
+app.get('/security/pass/hp/:id', authenticateToken, async (req, res) => {
+  try {
+    // Check if the user is logged in
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    // Try finding the specific visitor pass
+    let a;
+    try {
+      a = await Pass.findOne({ _id: req.params.id });
+    } catch (error) {
+      console.log(error.message);
+      return res.status(500).json({ message: error.message });
+    }
+
+    if (!a) {
+      return res.status(404).json({ message: 'Visitor pass not found' });
+    }
+
+    const v = await Visitor.findOne({_id:a.visitor_id});
+    return res.status(200).json({ phone_number: v.phone_number });
+    
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({ message: 'Internal server error occurred' });
+  }
+});
+
 //security approve
 app.patch('/security/approval', authenticateToken, async (req, res) => {
   try {
@@ -507,7 +545,12 @@ app.patch('/security/approval', authenticateToken, async (req, res) => {
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
 
     // Check user's authentication and admin/security role
-    if (!loggedInUser || loggedInUser.login_status !== true || (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security')) {
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
       return res.status(403).send('Unauthorized: Admin and security access only');
     }
 
@@ -544,7 +587,7 @@ app.get('/security/read/pending', authenticateToken, async (req, res) => {
     }
 
     // Check user's authentication and admin/security role
-    if (!loggedInUser || loggedInUser.login_status !== true || (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security')) {
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
       return res.status(403).send('Unauthorized: Admin and security access only');
     }
 

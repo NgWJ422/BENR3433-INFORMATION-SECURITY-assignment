@@ -644,6 +644,67 @@
  *                  $ref: '#components/schemas/errormessage'          
  */
 
+/**
+ * @swagger
+ *  /security/pass/hp/{id}:
+ *    get:
+ *      summary: Get visitor pass details by ID
+ *      description: Retrieves the phone number of the visitor associated with the specified pass ID.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      parameters:
+ *        - in: path
+ *          name: id
+ *          required: true
+ *          description: ID of the visitor pass to retrieve its visitor phone number
+ *          schema:
+ *            type: string
+ *      responses:
+ *        200:
+ *          description:  Successful response.
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                properties:
+ *                  phone_number:
+ *                      type: string
+ *                      description: Phone number of the associated visitor
+ * 
+ *        401:
+ *          description: Unauthorized. Please login.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized. Please login.
+ * 
+ *        403:
+ *          description: Forbidden. Access denied. You are not authorized to view this visitor pass.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Forbidden. Access denied. You are not authorized to view this visitor pass.
+ * 
+ *        404:
+ *          description: Visitor pass not found.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Visitor pass not found.
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'          
+ */
+
+
 
 /**
  * @swagger

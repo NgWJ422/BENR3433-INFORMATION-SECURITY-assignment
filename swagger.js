@@ -11,13 +11,61 @@
  *              description: to test get api
  */
 
+/**
+ * @swagger
+ * /test/register:
+ *  post:
+ *      summary: admin registration for penetration testing
+ *      tags:
+ *        - test
+ *      description: this api create admin for testing
+ *      requestBody:
+ *          required: true
+ *          content:
+ *              application/json:
+ *                  schema:
+ *                      type: object
+ *                      properties:
+ *                          username:
+ *                              type: string
+ *                          password:
+ *                              type: string
+ *                          name:
+ *                              type: string
+ *                          role:
+ *                              type: string
+ *                              
+ *      responses:
+ *          200:
+ *              description: added successfully
+ *              content:
+ *                 application/json:
+ *                  schema:
+ *                      type: object
+ *                      properties:
+ *                          user:
+ *                              $ref: '#components/schemas/registersuccessful'
+ *          409:
+ *              description: Username has been taken
+ *          500:
+ *              description: Internal server error
+ *              content:
+ *                  application/json:
+ *                      schema:
+ *                          type: object
+ *                          properties:
+ *                              message:
+ *                                  $ref: '#components/schemas/errormessage'
+ */
+
+
 
 
 /**
  * @swagger
  * /register:
  *  post:
- *      summary: registration for new users
+ *      summary: registration for new users requiring security approval
  *      tags:
  *        - User
  *      description: this api fetch data from mongodb
@@ -597,6 +645,70 @@
  */
 
 
+/**
+ * @swagger
+ *  /security/approval:
+ *    patch:
+ *      summary: Approve a user (Admin/Security)
+ *      description: |
+ *        Approves a pending user by their ID if the requester is an admin or security personnel.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      requestBody:
+ *          required: true
+ *          description: The ID of the pending user to approve.
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                properties:
+ *                  id:
+ *                      type: string
+ *                      example: 614f5f37600b29604c4cd1fa
+ *      responses:
+ *        200:
+ *          description: User approved successfully.
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *                properties:
+ *                  username:
+ *                    type: string
+ *                    description: Username of the approved user.
+ *                  approval:
+ *                    type: boolean
+ *                    description: Approval status of the user.
+ *                  message:
+ *                    type: string
+ *                    description: Confirmation message.
+ *                    example: User has been approved
+ * 
+ *        400:
+ *          description: User has already been approved.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: User has already been approved
+ * 
+ *        403:
+ *          description: Unauthorized access.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Admin and security access only
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'
+ */
+
 
 /**
  * @swagger
@@ -913,6 +1025,8 @@
  *                  visitor_id:
  *                      type: string
  *                      format: uuid
+ *                  approval:
+ *                      type: boolean
  *                  login_status:
  *                      type: boolean
  * 

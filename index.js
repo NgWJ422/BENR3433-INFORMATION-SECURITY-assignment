@@ -27,6 +27,7 @@ const options = {
         { name: 'test', description: 'testing endpoints' },
         { name: 'User', description: 'Endpoints related to users' },
         { name: 'Visitor', description: 'Endpoints related to visitor' },
+        { name: 'Security', description: 'Endpoints related to security' },
         { name: 'Read', description: 'Endpoints to read own file' },
         { name: 'For Admin Only', description: 'Endpoints for admin to manage user' },
       ],
@@ -43,9 +44,9 @@ const options = {
         },
       servers:[
         {
-            url: 'https://benr3433-information-security-assignment.azurewebsites.net/'
+            //url: 'https://benr3433-information-security-assignment.azurewebsites.net/'
             //remember to change current ip address in MongoDB Network Access List
-            //url: 'http://localhost:3000'
+            url: 'http://localhost:3000'
         }
       ]
     },
@@ -56,7 +57,7 @@ const options = {
   app.use('/swagger', swaggerUi.serve, swaggerUi.setup(openapiSpecification));
 
 
- mongoose.connect('mongodb+srv://jng010422:7NVCOJQwL6do3rXn@cluster0.junlsj6.mongodb.net/WJ_VMS')
+mongoose.connect('mongodb+srv://jng010422:7NVCOJQwL6do3rXn@cluster0.junlsj6.mongodb.net/WJ_VMS')
  .then(()=>{
      console.log('connected to mongodb')
      app.listen(port,() => {
@@ -68,13 +69,46 @@ const options = {
 
 
 
- app.get('/', (req, res) => {
+app.get('/', (req, res) => {
     res.send('Hello World! WJ')
  })
 
 
+//for penetration testing
+ app.post('/test/register', async (req, res) => {
+  try {
+    const { username, password, name, role } = req.body;
+    const existingUser = await User.findOne({ 'username': username });
 
- app.post('/register', async(req, res) => {
+    if (existingUser) {
+      return res.status(409).send('Username has been taken');
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const request = {
+      username: username,
+      password: hash,
+      name: name,
+      role: role,
+      approval: true,
+      login_status: false
+    };
+
+    const user = await User.create(request);
+    const responseMessage = 'User registered successfully';
+    
+    return res.status(200).json({
+      username: user.username,
+      name: user.name,
+      message: responseMessage
+    });
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+app.post('/register', async(req, res) => {
     try {
         const { username, password, name} = req.body;
         const a = await User.findOne({'username':req.body.username})
@@ -85,10 +119,11 @@ const options = {
             password: hash,
             name: name,
             role: "user",
+            approval: false,
             login_status: false
           }  
           const user = await User.create(request)
-          const responsemessage= 'User registered successfully';
+          const responsemessage= 'User registration pending';
           res.status(200).json({username:user.username,name:user.name, message: responsemessage})}
         else{
             res.status(409).send('Username has been taken');
@@ -100,32 +135,54 @@ const options = {
 })
 
 
-app.post('/login',async(req,res)=>{
-  const {username,password}=req.body
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
   try {
-    const b = await User.findOne({username:req.body.username})
-    if(b==null){
-      res.status(404).send('Username not found');
-    }else{
-      if(b.login_status==true){
-        res.status(409).send('User is already logged in');
-      }else{
-        const ismatch = await bcrypt.compare(req.body.password,b.password);      
-        if(ismatch != true){
-          res.status(401).send('Unauthorized: Wrong password');
-        }else{
-        await User.updateOne({username:req.body.username},{$set:{login_status:true}})
-        const login_user= await User.findOne({username:req.body.username})
-        access_token=jwt.sign({username:login_user.username,user_id:login_user._id},JWT_SECRET)
-        res.json({username:login_user.username,message:"login successful",accesstoken: access_token})
-      }
-      }
-      }}
-   catch (error) {
-    console.log(error.message);
-        res.status(500).json({message: error.message})
+    const user = await User.findOne({ username });
+    
+    if (!user) {
+      return res.status(404).send('Username not found');
+    }
+
+    if (user.login_status) {
+      return res.status(409).send('User is already logged in');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).send('Unauthorized: Wrong password');
+    }
+
+    if (user.approval != true) {
+      return res.json({ username: user.username, message: 'Registration pending, please logout and wait patiently' });
+    }
+
+    // Update login_status to true
+    await User.updateOne({ username }, { $set: { login_status: true } });
+
+    // Generate JWT token
+    const accessToken = jwt.sign({ username: user.username, user_id: user._id }, JWT_SECRET);
+    if(user.role == 'admin' ){
+      const allUsers = await User.find();
+      const allVisitors = await Visitor.find();
+      const allPasses = await Pass.find();
+  
+       return res.status(200).json({
+        username: user.username,
+        role:user.role,
+        message: 'Login successful',
+        token: accessToken,
+        Users: allUsers,
+        Visitors: allVisitors,
+        Visitor_Passes: allPasses,
+      });
+    }
+    res.json({ username: user.username, role:user.role , message: 'Login successful', token: accessToken });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: error.message });
   }
-})
+});
 
 //middleware
 function authenticateToken(req, res, next) {
@@ -339,7 +396,6 @@ app.patch('/visitor/visitor_pass/checkout/:id', authenticateToken, async (req, r
 });
 
 
-
 //read own user profile
 app.get('/read/user', authenticateToken, async (req, res) => {
   try {
@@ -377,6 +433,7 @@ app.get('/read/visitor', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Internal server error occurred' });
   }
 });
+
 
 //read all own visitor_pass 
 app.get('/read/visitor_pass', authenticateToken, async (req, res) => {
@@ -440,6 +497,39 @@ app.get('/read/visitor_pass/:id', authenticateToken, async (req, res) => {
   } catch (error) {
     console.log(error.message);
     return res.status(500).json({ message: 'Internal server error occurred' });
+  }
+});
+
+//security
+app.patch('/security/approval', authenticateToken, async (req, res) => {
+  try {
+    const p_user_id = req.body.id;
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // Check user's authentication and admin/security role
+    if (!loggedInUser || loggedInUser.login_status !== true || (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security')) {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    const pendinguser = await User.findOne({ _id: p_user_id });
+    if (!pendinguser) {
+      return res.status(404).send('Pending user not found');
+    }
+
+    if (pendinguser.approval === true) {
+      return res.status(400).send('User has already been approved');
+    }
+
+    const approved_user = await User.findOneAndUpdate({ _id: p_user_id }, { approval: true }, { new: true });
+
+    res.status(200).json({
+      username: approved_user.username,
+      approval: approved_user.approval,
+      message: 'User has been approved'
+    });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 

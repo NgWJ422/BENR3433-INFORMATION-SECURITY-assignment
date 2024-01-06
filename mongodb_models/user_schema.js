@@ -16,10 +16,14 @@ const userschema = mongoose.Schema(
         },
         role:{
             type: String,
+            enum: ['user', 'security','admin'],
             required: true
         },
         visitor_id:{
             type: mongoose.Schema.Types.ObjectId,ref:'Visitor'
+        },
+        approval:{
+            type: Boolean
         },
         login_status:{
             type: Boolean

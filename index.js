@@ -500,7 +500,7 @@ app.get('/read/visitor_pass/:id', authenticateToken, async (req, res) => {
   }
 });
 
-//security
+//security approve
 app.patch('/security/approval', authenticateToken, async (req, res) => {
   try {
     const p_user_id = req.body.id;
@@ -532,6 +532,38 @@ app.patch('/security/approval', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+//security read pending user
+app.get('/security/read/pending', authenticateToken, async (req, res) => {
+  try {
+    // Check if the user is logged in
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // If the user is not logged in or login status is not true, return 401 (Unauthorized)
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (!loggedInUser || loggedInUser.login_status !== true || (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security')) {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    // Find users with approval status as false
+    const pendingUsers = await User.find({ approval: false });
+
+    // Send the list of pending users as a JSON response
+    res.status(200).json(pendingUsers);
+    
+  } catch (error) {
+    // Log the error to console
+    console.log(error.message);
+    
+    // Return a 500 (Internal Server Error) along with an error message
+    return res.status(500).json({ message: 'Internal server error occurred' });
+  }
+});
+
+
 
 
 //Admin Dump API

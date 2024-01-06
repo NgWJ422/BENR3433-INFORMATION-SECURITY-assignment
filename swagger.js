@@ -709,6 +709,51 @@
  *                  $ref: '#components/schemas/errormessage'
  */
 
+/**
+ * @swagger
+ *  /security/read/pending:
+ *    get:
+ *      summary: Get pending users (Admin/Security)
+ *      description: Retrieves a list of pending users for admin or security personnel.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      responses:
+ *        200:
+ *          description: Successful response containing a list of pending users.
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: array
+ *                items:
+ *                  $ref: '#/components/schemas/User'
+ * 
+ *        401:
+ *          description: Unauthorized. Please login.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized. Please login.
+ * 
+ *        403:
+ *          description: Unauthorized access for non-admin/non-security users.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Forbidden. Access denied. Admin and security access only
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'          
+ */
+
+
+
 
 /**
  * @swagger

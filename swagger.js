@@ -18,9 +18,10 @@
  *      summary: admin registration for penetration testing
  *      tags:
  *        - test
- *      description: this api create admin for testing
+ *      description: Password must have minimum 8 characters.
  *      requestBody:
  *          required: true
+ *          description: Password must have minimum 8 characters.
  *          content:
  *              application/json:
  *                  schema:
@@ -30,6 +31,7 @@
  *                              type: string
  *                          password:
  *                              type: string
+ *                              
  *                          name:
  *                              type: string
  *                          role:
@@ -45,6 +47,8 @@
  *                      properties:
  *                          user:
  *                              $ref: '#components/schemas/registersuccessful'
+ *          400:
+ *              description: Invalid password. Please follow the password policy. Password must have minimum 8 characters.
  *          409:
  *              description: Username has been taken
  *          500:
@@ -68,9 +72,10 @@
  *      summary: registration for new users requiring security approval
  *      tags:
  *        - User
- *      description: this api fetch data from mongodb
+ *      description: this api fetch data from mongodb. Password must have minimum 8 characters.
  *      requestBody:
  *          required: true
+ *          description: Password must have minimum 8 characters.
  *          content:
  *              application/json:
  *                  schema:
@@ -85,6 +90,8 @@
  *                      properties:
  *                          user:
  *                              $ref: '#components/schemas/registersuccessful'
+ *          400:
+ *              description: Invalid password. Please follow the password policy.
  *          409:
  *              description: Username has been taken
  *          500:
@@ -97,6 +104,53 @@
  *                              message:
  *                                  $ref: '#components/schemas/errormessage'
  */
+
+/**
+ * @swagger
+ * /resident/register:
+ *  post:
+ *      summary: Register a new resident (admin access only)
+ *      tags:
+ *        - Resident
+ *      security:
+ *          - Authorization: []
+ *      requestBody:
+ *          required: true
+ *          content:
+ *              application/json:
+ *                  schema:
+ *                      type: object
+ *                      properties:
+ *                          resident_name:
+ *                              type: string
+ *                          resident_phone_number:
+ *                              type: string
+ *                          resident_address:
+ *                              type: string
+ *      responses:
+ *          200:
+ *              description: resident added successfully
+ *              content:
+ *                 application/json:
+ *                  schema:
+ *                      type: object
+ *                      properties:
+ *                          user:
+ *                              $ref: '#components/schemas/Resident'
+ *          403:
+ *              description: Unauthorized,admin access only
+ *          500:
+ *              description: Internal server error
+ *              content:
+ *                  application/json:
+ *                      schema:
+ *                          type: object
+ *                          properties:
+ *                              message:
+ *                                  $ref: '#components/schemas/errormessage'
+ */
+
+
 
 
 /**
@@ -242,7 +296,7 @@
  * @swagger
  *  /visitor/register:
  *    post:
- *      summary: Register a visitor for a user (1 user account only 1 visitor)
+ *      summary: Register a visitor for a user
  *      tags:
  *        - Visitor
  *      security:
@@ -276,14 +330,6 @@
  *              schema:
  *                $ref: '#components/schemas/Visitor'
  * 
- *        400:
- *          description: Visitor already created for this user
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Visitor has been created for this user (1 user 1 visitor)
- * 
  *        401:
  *          description: Unauthorized - User not logged in
  *          content:
@@ -302,39 +348,48 @@
 
 /**
  * @swagger
- *  /visitor/visitor_pass:
+ *  /visitor/visitor_pass/{id}:
  *    post:
- *      summary: Create a visitor pass
+ *      summary:  Create a new visitor pass for the specified visitor.
  *      tags:
  *        - Visitor
  *      security:
  *        - Authorization: []
+ *      parameters:
+ *          - in: path
+ *            name: id
+ *            required: true
+ *            description: ID of the visitor to create visitor pass
+ *            schema:
+ *              type: string
  *      requestBody:
  *        required: true
+ *        description: The visitor pass details
  *        content:
  *          application/json:
  *            schema:
  *               type: object
  *               properties:
+ *                resident_number:
+ *                  type: number
  *                purpose_of_visit:
- *                  type: string
- *                host_name:
- *                  type: string
- *                host_address:
  *                  type: string
  *                remarks:
  *                  type: string
  *               required:
  *                  - purpose_of_visit
- *                  - host_name
- *                  - host_address
+ *                  - resident_number
  *      responses:
- *        200:
- *          description: Visitor pass created successfully
+ *        201:
+ *          description: Successfully created a new visitor pass
  *          content:
  *            application/json:
- *              schema:
- *                $ref: '#components/schemas/Pass'
+ *              example:
+ *                  visitor_id: 123
+ *                  resident_number: 1
+ *                  purpose_of_visit: "meeting"
+ *                  approval: false
+ *                  remarks: "No special remarks"
  * 
  *        401:
  *          description: Unauthorized - User not logged in
@@ -343,6 +398,8 @@
  *              schema:
  *                type: string
  *                example: Please login
+ *        403:
+ *          description: The visitor does not belong to this user or insufficient permissions
  * 
  *        404:
  *          description: Visitor not found for this user
@@ -357,130 +414,6 @@
  *            application/json:
  *              schema:
  *                  $ref: '#components/schemas/errormessage'
- */
-
-
-/**
- * @swagger
- *  /visitor/visitor_pass/checkin/{id}:
- *    patch:
- *      summary: Check in a visitor pass by ID
- *      tags:
- *        - Visitor
- *      security:
- *        - Authorization: []
- *      parameters:
- *        - in: path
- *          name: id
- *          required: true
- *          description: ID of the visitor pass to check in
- *          schema:
- *            type: string
- *      responses:
-  *        200:
- *          description: Visitor pass checked in successfully
- *          content:
- *            application/json:
- *              schema:
- *                type: object
- *                properties:
- *                  message:
- *                    type: string
- *                    example: Visitor pass checked in successfully
- *                  updatedPass:
- *                    $ref: '#components/schemas/Pass'
- * 
- *        400:
- *          description: User has not registered as a visitor
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Please register as a visitor
- * 
- *        401:
- *          description: Unauthorized - User not logged in
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Please login
- * 
- *        404:
- *          description: Visitor pass not found
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Visitor pass not found
- *        500:
- *          description: Internal server error
- *          content:
- *            application/json:
- *              schema:
- *                  $ref: '#components/schemas/errormessage'          
- */
-
-
-/**
- * @swagger
- *  /visitor/visitor_pass/checkout/{id}:
- *    patch:
- *      summary: Check out a visitor pass by ID
- *      tags:
- *        - Visitor
- *      security:
- *        - Authorization: []
- *      parameters:
- *        - in: path
- *          name: id
- *          required: true
- *          description: ID of the visitor pass to check out
- *          schema:
- *            type: string
- *      responses:
-  *        200:
- *          description: Visitor pass checked out successfully
- *          content:
- *            application/json:
- *              schema:
- *                type: object
- *                properties:
- *                  message:
- *                    type: string
- *                    example: Visitor pass checked out successfully
- *                  updatedPass:
- *                    $ref: '#components/schemas/Pass'
- * 
- *        400:
- *          description: User has not registered as a visitor
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Please register as a visitor
- * 
- *        401:
- *          description: Unauthorized - User not logged in
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Please login
- * 
- *        404:
- *          description: Visitor pass not checked in or not found
- *          content:
- *            text/plain:
- *              schema:
- *                type: string
- *                example: Visitor pass not checked in or not found
- *        500:
- *          description: Internal server error
- *          content:
- *            application/json:
- *              schema:
- *                  $ref: '#components/schemas/errormessage'          
  */
 
 
@@ -534,7 +467,9 @@
  *          content:
  *            application/json:
  *              schema:
- *                $ref: '#/components/schemas/Visitor'
+ *                type: array
+ *                items:
+ *                  $ref: '#/components/schemas/Visitor'
  *        401:
  *          description: Unauthorized, please login
  *          content:
@@ -556,21 +491,15 @@
  * @swagger
  *  /read/visitor_pass:
  *    get:
- *      summary: Retrieve own visitor information
+ *      summary: Read all visitor passes for all visitors (Logged-in User)
+ *      description: Retrieves all visitor passes for all visitors associated with the logged-in user.
  *      security:
  *        - Authorization: []
  *      tags:
  *        - Read
- *      description: Retrieves all visitor passes associated with the logged-in user
  *      responses:
  *        200:
- *          description: Successful operation
- *          content:
- *            application/json:
- *              schema:
- *                type: array
- *                items:
- *                  $ref: '#/components/schemas/Pass'
+ *          description: Successful response with a JSON object representing passes for each visitor
  *        401:
  *          description: Unauthorized, please login
  *          content:
@@ -593,7 +522,7 @@
  *  /read/visitor_pass/{id}:
  *    get:
  *      summary: Read one visitor pass by ID
- *      description: Visitor can only search their own visitor pass while admin can search visitor pass of any visitor
+ *      description: Retrieves details of a visitor pass based on its ID.
  *      tags:
  *        - Read
  *      security:
@@ -622,12 +551,12 @@
  *                example: Unauthorized. Please login.
  * 
  *        403:
- *          description: Forbidden. Access denied. You are not authorized to view this visitor pass.
+ *          description: Forbidden, visitor pass does not belong to the logged-in user's visitor
  *          content:
  *            text/plain:
  *              schema:
  *                type: string
- *                example: Forbidden. Access denied. You are not authorized to view this visitor pass.
+ *                example: Forbidden, visitor pass does not belong to the logged-in user's visitor
  * 
  *        404:
  *          description: Visitor pass not found.
@@ -708,7 +637,7 @@
 
 /**
  * @swagger
- *  /security/approval:
+ *  /security/user/approval:
  *    patch:
  *      summary: Approve a user (Admin/Security)
  *      description: |
@@ -772,7 +701,7 @@
 
 /**
  * @swagger
- *  /security/read/pending:
+ *  /security/read/user/pending:
  *    get:
  *      summary: Get pending users (Admin/Security)
  *      description: Retrieves a list of pending users for admin or security personnel.
@@ -805,6 +734,269 @@
  *              schema:
  *                type: string
  *                example: Forbidden. Access denied. Admin and security access only
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'          
+ */
+
+/**
+ * @swagger
+ *  /security/read/pass:
+ *    post:
+ *      summary: Get a list of visitor passes based on criteria (Security/Admin)
+ *      description: Retrieve a list of visitor passes based on the provided criteria. Requires admin or security role.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      requestBody:
+ *        required: true
+ *        content:
+ *          application/json:
+ *            example:
+ *              _id: "123456"
+ *      responses:
+ *        200:
+ *          description: Successful response with a list of visitor passes
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: array
+ *                items:
+ *                  $ref: '#/components/schemas/Pass'
+ *        401:
+ *          description: Unauthorized, please login
+ *        403:
+ *          description: Unauthorized, admin and security access only
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                 $ref: '#components/schemas/errormessage'
+ *                
+ */
+
+
+
+
+
+
+/**
+ * @swagger
+ *  /security/read/resident:
+ *    post:
+ *      summary: Get details of a resident by resident number (Security/Admin)
+ *      description: Retrieve details of a resident based on the resident number. Requires admin or security role.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      requestBody:
+ *          description: Resident details request
+ *          required: true
+ *          content:
+ *              application/json:
+ *                  schema:
+ *                      type: object
+ *                      properties:
+ *                          resident_number:
+ *                              type: integer
+ *                              description: Resident number
+ *                              example: 1
+ *      responses:
+ *        200:
+ *          description: Successful response with a list of residents
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: array
+ *                items:
+ *                  $ref: '#/components/schemas/Resident'
+ * 
+ *        401:
+ *          description: Unauthorized. Please login.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized. Please login.
+ * 
+ *        403:
+ *          description: Unauthorized access for non-admin/non-security users.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Forbidden. Access denied. Admin and security access only
+ *        404:
+ *          description: Resident not found
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'          
+ */
+
+/**
+ * @swagger
+ *  /security/pass/approval/{id}:
+ *    patch:
+ *      summary: Approve a visitor pass (Security/Admin)
+ *      description: Approve a pending visitor pass. Requires admin or security role.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      parameters:
+ *        - in: path
+ *          name: id
+ *          required: true
+ *          description: ID of the pending visitor pass
+ *          schema:
+ *            type: string
+ *      responses:
+ *        200:
+ *          description: Visitor pass has been approved
+ *          content:
+ *            application/json:
+ *              schema:
+ *                type: object
+ *              example:
+ *                  Pass: "approved_pass"
+ *                  message: "Pass has been approved"
+ * 
+ *        401:
+ *          description: Unauthorized. Please login.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized. Please login.
+ * 
+ *        403:
+ *          description: Forbidden. Access denied. You are not authorized to view this visitor pass.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Forbidden. Access denied. You are not authorized to view this visitor pass.
+ * 
+ *        404:
+ *          description: Pending visitor pass not found
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Pending visitor pass not found
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'          
+ */
+
+/**
+ * @swagger
+ *  /security/pass/checkin/{id}:
+ *    patch:
+ *      summary: Check in a visitor pass (Security/Admin)
+ *      description: Check in a visitor pass based on the provided pass ID. Requires admin or security role.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      parameters:
+ *        - in: path
+ *          name: id
+ *          required: true
+ *          description: Visitor pass ID
+ *          schema:
+ *            type: string
+ *      responses:
+ *        200:
+ *          description: Successful response with the updated visitor pass details
+ *          content:
+ *            application/json:
+ *              schema:
+ *                $ref: '#components/schemas/Pass'  
+ *                  
+ * 
+ *        401:
+ *          description: Unauthorized. Please login.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized. Please login.
+ * 
+ *        403:
+ *          description: Unauthorized, admin and security access only
+ * 
+ *        404:
+ *          description: Visitor pass not found
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Visitor pass not found
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'          
+ */
+
+/**
+ * @swagger
+ *  /security/pass/checkout/{id}:
+ *    patch:
+ *      summary: Check out a visitor pass (Security/Admin)
+ *      description: Check out a visitor pass based on the provided pass ID. Requires admin or security role.
+ *      tags:
+ *        - Security
+ *      security:
+ *        - Authorization: []
+ *      parameters:
+ *        - in: path
+ *          name: id
+ *          required: true
+ *          description: Visitor pass ID
+ *          schema:
+ *            type: string
+ *      responses:
+ *        200:
+ *          description: Successful response with the updated visitor pass details
+ *          content:
+ *            application/json:
+ *              schema:
+ *                $ref: '#components/schemas/Pass'  
+ *                  
+ * 
+ *        401:
+ *          description: Unauthorized. Please login.
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized. Please login.
+ * 
+ *        403:
+ *          description: Unauthorized, admin and security access only
+ * 
+ *        404:
+ *          description: Visitor pass not found
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Visitor pass not found
  *        500:
  *          description: Internal server error
  *          content:
@@ -888,7 +1080,7 @@
  *        - in: path
  *          name: collections
  *          required: true
- *          description: Name of the collection to retrieve data from(select from User, Visitor, Visitor_Pass)
+ *          description: Name of the collection to retrieve data from(select from User, Visitor, Visitor_Pass, Resident)
  *          type: string
  *          
  *      requestBody:
@@ -958,13 +1150,14 @@
  *        - in: query
  *          name: collections
  *          required: true
- *          description: Name of the collection (User, Visitor, or Visitor_Pass)
+ *          description: Name of the collection (User, Visitor,Visitor_Pass, or Resident)
  *          schema:
  *             type: string
  *             enum: 
  *              - User
  *              - Visitor
  *              - Visitor_Pass
+ *              - Resident
  * 
  *      requestBody:
  *          name: update
@@ -975,7 +1168,7 @@
  *              schema:
  *                type: object
  *              example: 
- *                field1: value1
+ *                _id: value1
  *                field2: value2
  *      responses:
  *        200:
@@ -1074,6 +1267,51 @@
  */
 
 
+/**
+ * @swagger
+ *  /admin/delete/visitor/{id}:
+ *    delete:
+ *      summary: Delete a visitor and associated visitor_pass documents (Admin only)
+ *      description: |
+ *        Delete a visitor and associated visitor_pass documents (Admin only)
+ *      tags:
+ *        - For Admin Only
+ *      security:
+ *        - Authorization: []
+ *      parameters:
+ *        - in: path
+ *          name: id
+ *          required: true
+ *          description: ID of the visitor to be deleted
+ *          schema:
+ *            type: string
+ *       
+ *      responses:
+ *        200:
+ *          description:  Visitor and associated data deleted successfully
+ * 
+ *        403:
+ *          description: Unauthorized, Admin access only
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Unauthorized, Admin access only
+ * 
+ *        404:
+ *          description: Visitor not found
+ *          content:
+ *            text/plain:
+ *              schema:
+ *                type: string
+ *                example: Visitor not found
+ *        500:
+ *          description: Internal server error
+ *          content:
+ *            application/json:
+ *              schema:
+ *                  $ref: '#components/schemas/errormessage'
+ */
 
 /**
  * @swagger
@@ -1117,6 +1355,17 @@
  *                type: string
  *                format: uuid
  * 
+ *          Resident:
+ *              type: object
+ *              properties:
+ *                  resident_number:
+ *                      type: number
+ *                  resident_name:
+ *                      type: string
+ *                  resident_phone_number:
+ *                      type: string
+ *                  resident_address:
+ *                      type: string
  *          User:
  *              type: object
  *              properties:
@@ -1129,8 +1378,10 @@
  *                  role:
  *                      type: string
  *                  visitor_id:
- *                      type: string
- *                      format: uuid
+ *                      type: array
+ *                      items:
+ *                          type: string
+ *                          format: uuid
  *                  approval:
  *                      type: boolean
  *                  login_status:
@@ -1160,12 +1411,12 @@
  *                  visitor_id:
  *                      type: string
  *                      format: uuid
+ *                  resident_number:
+ *                      type: number
  *                  purpose_of_visit:
  *                      type: string
- *                  host_name:
- *                      type: string 
- *                  host_address:
- *                      type: string
+ *                  approval:
+ *                      type: boolean 
  *                  checkin_time:
  *                      type: string
  *                      format: date-time

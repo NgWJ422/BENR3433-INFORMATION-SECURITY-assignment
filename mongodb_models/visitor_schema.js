@@ -19,10 +19,12 @@ const visitorschema = mongoose.Schema(
             required: true
         },
         user_id:{
-            type: mongoose.Schema.Types.ObjectId, ref:'User'
+            type: mongoose.Schema.Types.ObjectId, 
+            ref:'users'
         },
         visitor_pass_id:[{
-            type: mongoose.Schema.Types.ObjectId, ref:'V_pass'
+            type: mongoose.Schema.Types.ObjectId, 
+            ref:'visitor passes'
         }]
     },
     { versionKey: false }

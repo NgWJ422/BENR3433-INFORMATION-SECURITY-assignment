@@ -3,18 +3,19 @@ const mongoose = require('mongoose')
 const visitor_pass_schema = mongoose.Schema(
     {
         visitor_id:{
-            type: mongoose.Schema.Types.ObjectId,ref:'Visitor'
+            type: mongoose.Schema.Types.ObjectId,
+            ref:'visitors'
         },
+        resident_number: {
+            type: mongoose.Schema.Types.Number,
+            ref: 'residents'
+          },
         purpose_of_visit:{
             type: String,
             required: true
         },
-        host_name:{
-            type: String,
-            required: true
-        },
-        host_address:{
-            type: String,
+        approval:{
+            type: Boolean,
             required: true
         },
         checkin_time:{

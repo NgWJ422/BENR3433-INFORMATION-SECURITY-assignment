@@ -19,9 +19,10 @@ const userschema = mongoose.Schema(
             enum: ['user', 'security','admin'],
             required: true
         },
-        visitor_id:{
-            type: mongoose.Schema.Types.ObjectId,ref:'Visitor'
-        },
+        visitor_id:[{
+            type: mongoose.Schema.Types.ObjectId,
+            ref:'visitors'
+        }],
         approval:{
             type: Boolean
         },

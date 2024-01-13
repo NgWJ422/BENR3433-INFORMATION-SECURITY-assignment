@@ -5,10 +5,14 @@ const mongoose = require('mongoose')
 const User = require('./mongodb_models/user_schema')
 const Visitor = require('./mongodb_models/visitor_schema')
 const Pass = require('./mongodb_models/visitor_pass_schema')
+const Resident = require('./mongodb_models/resident_schema')
 const jwt = require('jsonwebtoken')
 const app = express()
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const rateLimit = require('express-rate-limit');
+const validator = require('validator');
+
 
 
 const port = process.env.PORT || 3000;
@@ -16,6 +20,32 @@ const port = process.env.PORT || 3000;
 
 
 app.use(express.json())
+
+// Enable if you're behind a proxy (e.g., Heroku, Nginx)
+app.set('trust proxy', 1);
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  handler: (req, res) => {
+    res.status(429).json({
+      status: 'error',
+      message: 'Too many requests. Please try again later.',
+    });
+  },
+});
+
+// Apply the rate limiter to all routes
+app.use(limiter);
+
+const validatePassword = (password) => {
+  // Minimum 8 characters
+  const passwordRegex = /^.{8,}$/;
+
+  return passwordRegex.test(password);
+};
+
+
 
 const options = {
     definition: {
@@ -27,6 +57,7 @@ const options = {
       },
       tags:[
         { name: 'test', description: 'testing endpoints' },
+        { name: 'Resident', description: 'Create residents(for admin only)' },
         { name: 'User', description: 'Endpoints related to users' },
         { name: 'Visitor', description: 'Endpoints related to visitor' },
         { name: 'Security', description: 'Endpoints related to security' },
@@ -72,11 +103,14 @@ mongoose.connect(process.env.mongo_url)
 
 
 app.get('/', (req, res) => {
-    res.send('Hello World! WJ')
+    res.send('Hello World! NgWJ')
  })
 
 
-//for penetration testing
+
+
+
+//for penetration testing(no need for approval)
  app.post('/test/register', async (req, res) => {
   try {
     const { username, password, name, role } = req.body;
@@ -84,6 +118,10 @@ app.get('/', (req, res) => {
 
     if (existingUser) {
       return res.status(409).send('Username has been taken');
+    }
+
+    if (!validatePassword(req.body.password)) {
+      return res.status(400).send('Invalid password. Please follow the password policy.');
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -110,10 +148,17 @@ app.get('/', (req, res) => {
   }
 });
 
+//create a new user(need approval)
 app.post('/register', async(req, res) => {
     try {
         const { username, password, name} = req.body;
         const a = await User.findOne({'username':req.body.username})
+        console.log('Received Password:', password); 
+        if (!validatePassword(password)) {
+          return res.status(400).send('Invalid password. Please follow the password policy.');
+        }
+
+
         const hash = await bcrypt.hash(password, 10)
         if(a == null){
           const request ={
@@ -136,7 +181,38 @@ app.post('/register', async(req, res) => {
     }
 })
 
+//create a new resident(for admin)
+app.post('/resident/register',authenticateToken, async(req, res) => {
+  try {
+      const loggedInUser = await User.findOne({ _id: req.user.user_id });
 
+      // Check user's authentication and admin role
+      if (!loggedInUser || loggedInUser.login_status !== true || loggedInUser.role !== 'admin') {
+        return res.status(403).send('Unauthorized: Admin access only');
+      }
+      const { resident_name, resident_phone_number, resident_address} = req.body;
+      const newResident = await Resident.create(
+        {
+          resident_name: resident_name,
+          resident_phone_number: resident_phone_number,
+          resident_address: resident_address
+        }
+      )
+      const responsePayload = {
+        resident_number: newResident.resident_number,
+        resident_name: newResident.resident_name,
+        resident_phone_number: newResident.resident_phone_number,
+        resident_address: newResident.resident_address,
+      };
+  
+      res.status(200).json(responsePayload);
+  } catch (error) {
+      console.log(error.message);
+      res.status(500).json({message: error.message})
+  }
+})
+
+//login for user,security and admin
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -168,6 +244,7 @@ app.post('/login', async (req, res) => {
       const allUsers = await User.find();
       const allVisitors = await Visitor.find();
       const allPasses = await Pass.find();
+      const allresident = await Resident.find();
   
        return res.status(200).json({
         username: user.username,
@@ -177,6 +254,7 @@ app.post('/login', async (req, res) => {
         Users: allUsers,
         Visitors: allVisitors,
         Visitor_Passes: allPasses,
+        Resident: allresident
       });
     }
     res.json({ username: user.username, role:user.role , message: 'Login successful', token: accessToken });
@@ -227,7 +305,7 @@ app.patch('/logout', async (req, res) => {
 });
 
 /**
- * Endpoint to register a visitor for a user (1 user account only 1 visitor)
+ * Endpoint to register a visitor for a user
  */
 app.post('/visitor/register', authenticateToken, async (req, res) => {
   try {
@@ -235,11 +313,6 @@ app.post('/visitor/register', authenticateToken, async (req, res) => {
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
     if (!loggedInUser || loggedInUser.login_status !== true) {
       return res.status(401).send('Please login');
-    }
-
-    // Check if the user already has a visitor ID
-    if (loggedInUser.visitor_id != null) {
-      return res.status(400).send('Visitor has been created for this user (1 user 1 visitor)');
     }
 
     // Create a visitor record
@@ -255,7 +328,7 @@ app.post('/visitor/register', authenticateToken, async (req, res) => {
     const visitor = await Visitor.create(newVisitorData);
 
     // Update the user's visitor_id field with the newly created visitor's ID
-    await User.updateOne({ _id: req.user.user_id }, { $set: { 'visitor_id': visitor._id } });
+    await User.updateOne({ _id: req.user.user_id }, { $push: { 'visitor_id': visitor._id } });
 
     // Return the newly created visitor details
     return res.status(200).json(visitor);
@@ -269,7 +342,7 @@ app.post('/visitor/register', authenticateToken, async (req, res) => {
 /**
  * Endpoint to create a visitor pass
  */
-app.post('/visitor/visitor_pass', authenticateToken, async (req, res) => {
+app.post('/visitor/visitor_pass/:id', authenticateToken, async (req, res) => {
   try {
     // Check if the user is logged in
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
@@ -277,18 +350,28 @@ app.post('/visitor/visitor_pass', authenticateToken, async (req, res) => {
       return res.status(401).send('Please login');
     }
 
-    // Find the visitor associated with the logged-in user
-    const visitor = await Visitor.findOne({ user_id: req.user.user_id });
-    if (!visitor) {
-      return res.status(404).send('Visitor not found for this user');
+    // Check if the specified visitor exists
+    const vvisitor = await Visitor.findOne({ _id: req.params.id });
+    if (!vvisitor) {
+      return res.status(404).send('Visitor not found');
+    }
+
+    // Check if the visitor belongs to the logged-in user
+    if (vvisitor.user_id != req.user.user_id) {
+      return res.status(403).send('The visitor does not belong to this user');
+    }
+
+    const vresident = await Resident.findOne({resident_number: req.body.resident_number})
+    if(!vresident){
+      return res.status(404).send('resident does not exist')
     }
 
     // Create a new visitor pass
     const newVisitorPass = {
-      visitor_id: visitor._id,
+      visitor_id: vvisitor._id,
+      resident_number: req.body.resident_number,
       purpose_of_visit: req.body.purpose_of_visit,
-      host_name: req.body.host_name,
-      host_address: req.body.host_address,
+      approval: false,
       remarks: req.body.remarks
     };
 
@@ -297,105 +380,18 @@ app.post('/visitor/visitor_pass', authenticateToken, async (req, res) => {
 
     // Update the visitor with the newly created visitor pass ID
     await Visitor.updateOne(
-      { _id: visitor._id },
+      { _id: vvisitor._id },
       { $push: { 'visitor_pass_id': createdVisitorPass._id } }
     );
 
     // Return the newly created visitor pass details
-    return res.status(200).json(createdVisitorPass);
+    return res.status(201).json(createdVisitorPass);
   } catch (error) {
     console.log(error.message);
     return res.status(500).json({ message: 'Internal server error occurred' });
   }
 });
 
-
-/**
- * Endpoint to check in a visitor pass by ID
- */
-app.patch('/visitor/visitor_pass/checkin/:id', authenticateToken, async (req, res) => {
-  try {
-    // Check if the user is logged in
-    const loggedInUser = await User.findOne({ _id: req.user.user_id });
-    if (!loggedInUser || loggedInUser.login_status !== true) {
-      return res.status(401).send('Please login');
-    }
-
-    // Check if the user has registered as a visitor
-    if (loggedInUser.visitor_id == null) {
-      return res.status(400).send('Please register as a visitor');
-    }
-
-    // Check if the visitor pass is already checked in
-    const existingVisitorPass = await Pass.findOne({ _id: req.params.id, checkin_time: { $exists: true } });
-    if (existingVisitorPass) {
-      return res.status(400).send('Visitor pass already checked in');
-    }
-
-    // Update check-in time for the visitor pass
-    const date = new Date().toISOString();
-    const updatedVisitorPass = await Pass.findOneAndUpdate(
-      { _id: req.params.id },
-      { $set: { checkin_time: date } },
-      { new: true } // Return the updated document
-    );
-
-    // Check if the visitor pass was updated
-    if (!updatedVisitorPass) {
-      return res.status(404).send('Visitor pass not found');
-    }
-
-    // Return success message along with the updated visitor pass
-    res.status(200).json({ message: 'Visitor pass checked in successfully', updatedPass: updatedVisitorPass });
-  } catch (error) {
-    console.log(error.message);
-    res.status(500).json({ message: 'Internal server error occurred' });
-  }
-});
-
-/**
- * Endpoint to check out all visitor pass by ID
- */
-app.patch('/visitor/visitor_pass/checkout/:id', authenticateToken, async (req, res) => {
-  try {
-    // Check if the user is logged in
-    const loggedInUser = await User.findOne({ _id: req.user.user_id });
-    if (!loggedInUser || loggedInUser.login_status !== true) {
-      return res.status(401).send('Please login');
-    }
-
-    // Check if the user has registered as a visitor
-    if (loggedInUser.visitor_id == null) {
-      return res.status(400).send('Please register as a visitor');
-    }
-
-    // Check if the visitor pass exists and was checked in
-    const existingVisitorPass = await Pass.findOne({ _id: req.params.id, checkin_time: { $exists: true } });
-    if (!existingVisitorPass) {
-      return res.status(404).send('Visitor pass not checked in or not found');
-    }
-
-    // Check if the visitor pass exists and was checked out
-    const alreadyCheckedOutPass = await Pass.findOne({ _id: req.params.id, checkout_time: { $exists: true } });
-    if (alreadyCheckedOutPass) {
-        return res.status(400).send('Visitor pass already checked out');
-    }
-
-    // Update checkout time for the visitor pass
-    const date = new Date().toISOString();
-    const updatedVisitorPass = await Pass.findOneAndUpdate(
-      { _id: req.params.id },
-      { $set: { checkout_time: date } },
-      { new: true } // Return the updated document
-    );
-
-    // Return success message along with the updated visitor pass
-    res.status(200).json({ message: 'Visitor pass checked out successfully', updatedPass: updatedVisitorPass });
-  } catch (error) {
-    console.log(error.message);
-    res.status(500).json({ message: 'Internal server error occurred' });
-  }
-});
 
 
 //read own user profile
@@ -428,7 +424,7 @@ app.get('/read/visitor', authenticateToken, async (req, res) => {
       return res.status(401).send('Please login');
     }
 
-    const associatedVisitors = await Visitor.findOne({ _id: loggedInUser.visitor_id });
+    const associatedVisitors = await Visitor.find({ user_id: loggedInUser._id });
     res.status(200).json(associatedVisitors);
   } catch (error) {
     console.log(error.message);
@@ -437,7 +433,7 @@ app.get('/read/visitor', authenticateToken, async (req, res) => {
 });
 
 
-//read all own visitor_pass 
+// Read all visitor passes for all visitors of the logged-in user
 app.get('/read/visitor_pass', authenticateToken, async (req, res) => {
   try {
     // Find the logged-in user document
@@ -448,54 +444,42 @@ app.get('/read/visitor_pass', authenticateToken, async (req, res) => {
       return res.status(401).send('Please login');
     }
 
-    const passList = await Pass.find({ visitor_id: loggedInUser.visitor_id });
-    res.status(200).json(passList);
+    // Create an object to store passes for each visitor
+    const passesByVisitor = {};
+
+    // Retrieve visitor passes for all visitors of the logged-in user
+    for (const visitorId of loggedInUser.visitor_id) {
+      const passesForVisitor = await Pass.find({ visitor_id: visitorId });
+      passesByVisitor[visitorId] = passesForVisitor;
+    }
+
+    res.status(200).json(passesByVisitor);
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: 'Internal server error occurred' });
   }
 });
 
+
 // Read one visitor pass based on its ID
 app.get('/read/visitor_pass/:id', authenticateToken, async (req, res) => {
   try {
-    // Check if the user is logged in
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
     if (!loggedInUser || loggedInUser.login_status !== true) {
       return res.status(401).send('Please login');
     }
 
-    // Try finding the specific visitor pass
-    let a;
-    try {
-      a = await Pass.findOne({ _id: req.params.id });
-    } catch (error) {
-      console.log(error.message);
-      return res.status(500).json({ message: error.message });
-    }
-
-    if (!a) {
+    const vpass = await Pass.findOne({ _id: req.params.id });
+    if (!vpass) {
       return res.status(404).json({ message: 'Visitor pass not found' });
     }
 
-    if (loggedInUser.role !== 'admin') {
-      // Check if the user has registered as a visitor
-      if (loggedInUser.visitor_id == null) {
-        return res.status(400).send('Please register as a visitor');
-      }
-
-      // Deny access if trying to access other visitor's visitor pass
-      p = a.visitor_id !== loggedInUser.visitor_id
-      if (p = false) {
-        return res.status(403).json({ message: 'Access denied. You are not authorized to view this visitor pass.' });
-      }
-
-      // Return the visitor pass if authorized
-      return res.status(200).json(a);
-    } else {
-      // Admin access
-      return res.status(200).json(a);
+    const pvisitor = await Visitor.findOne({ _id: vpass.visitor_id });
+    if (pvisitor.user_id != req.user.user_id) {
+      return res.status(403).json({ message: 'This visitor pass does not belong to your visitor' });
     }
+
+    return res.json(vpass);
   } catch (error) {
     console.log(error.message);
     return res.status(500).json({ message: 'Internal server error occurred' });
@@ -503,7 +487,8 @@ app.get('/read/visitor_pass/:id', authenticateToken, async (req, res) => {
 });
 
 
-//retrieve phone number from visitor pass
+
+//retrieve phone number of the visitor from visitor pass
 app.get('/security/pass/hp/:id', authenticateToken, async (req, res) => {
   try {
     // Check if the user is logged in
@@ -538,8 +523,8 @@ app.get('/security/pass/hp/:id', authenticateToken, async (req, res) => {
   }
 });
 
-//security approve
-app.patch('/security/approval', authenticateToken, async (req, res) => {
+//security pending user approve
+app.patch('/security/user/approval', authenticateToken, async (req, res) => {
   try {
     const p_user_id = req.body.id;
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
@@ -575,8 +560,9 @@ app.patch('/security/approval', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 //security read pending user
-app.get('/security/read/pending', authenticateToken, async (req, res) => {
+app.get('/security/read/user/pending', authenticateToken, async (req, res) => {
   try {
     // Check if the user is logged in
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
@@ -606,8 +592,176 @@ app.get('/security/read/pending', authenticateToken, async (req, res) => {
   }
 });
 
+//security check visitor pass
+app.post('/security/read/pass', authenticateToken, async (req, res) => {
+  try {
+    // Check if the user is logged in
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    const passlist = await Pass.find(req.body)
+    return res.status(200).json(passlist);
+  } catch (error) {
+    console.log(error.message);
+    return res.status(500).json({ message: 'Internal server error occurred' });
+  }
+});
 
 
+//security read details of resident
+app.post('/security/read/resident', authenticateToken, async (req, res) => {
+  try {
+    // Check if the user is logged in
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // If the user is not logged in or login status is not true, return 401 (Unauthorized)
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    if (isNaN(req.body.resident_number)) {
+      return res.status(400).send('Invalid resident number');
+    }
+    const residentDetails = await Resident.findOne({ resident_number: req.body.resident_number });
+    if (!residentDetails) {
+      return res.status(404).send('Resident not found');
+    }
+    res.status(200).json(residentDetails);
+  } catch (error) {
+    console.log(error.message);
+    res.status(500).json({ message: 'Internal server error occurred' });
+  }
+});
+
+//security approve visitor pass
+app.patch('/security/pass/approval/:id', authenticateToken, async (req, res) => {
+  try {
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // Check user's authentication and admin/security role
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    const pendingpass = await Pass.findOne({ _id: req.params.id });
+    if (!pendingpass) {
+      return res.status(404).send('Pending visitor pass not found');
+    }
+
+    if (pendingpass.approval === true) {
+      return res.status(400).send('Pass has already been approved');
+    }
+
+    const approved_pass = await Pass.findOneAndUpdate({ _id: req.params.id }, { approval: true }, { new: true });
+
+    res.status(200).json({
+      Pass: approved_pass,
+      message: 'Pass has been approved'
+    });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+//security checkin a visitor pass
+app.patch('/security/pass/checkin/:id', authenticateToken, async (req, res) => {
+  try {
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // Check user's authentication and admin/security role
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    const vpass = await Pass.findOne({ _id: req.params.id });
+    if (!vpass) {
+      return res.status(404).send('visitor pass not found');
+    }
+
+    if (vpass.approval === false) {
+      return res.send('Pass has not been approved');
+    }
+
+    if(vpass.checkin_time != null){
+      return res.send('Pass has been check in');
+    }
+
+    if(vpass.checkout_time != null){
+      return res.send('Pass has been check out');
+    }
+    const date = new Date().toISOString();
+    const checkin_pass = await Pass.findOneAndUpdate({ _id: req.params.id }, { $set: { checkin_time: date } }, { new: true });
+
+    res.status(200).json(checkin_pass);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+//security checkout a visitor pass
+app.patch('/security/pass/checkout/:id', authenticateToken, async (req, res) => {
+  try {
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // Check user's authentication and admin/security role
+    if (!loggedInUser || loggedInUser.login_status !== true) {
+      return res.status(401).send('Please login');
+    }
+
+    // Check user's authentication and admin/security role
+    if (loggedInUser.role !== 'admin' && loggedInUser.role !== 'security') {
+      return res.status(403).send('Unauthorized: Admin and security access only');
+    }
+
+    const vpass = await Pass.findOne({ _id: req.params.id });
+    if (!vpass) {
+      return res.status(404).send('visitor pass not found');
+    }
+
+    if (vpass.approval === false) {
+      return res.send('Pass has not been approved');
+    }
+
+    if(vpass.checkin_time == null){
+      return res.send('Pass has not been check in');
+    }
+
+    if(vpass.checkout_time != null){
+      return res.send('Pass has been check out');
+    }
+    const date = new Date().toISOString();
+    const checkin_pass = await Pass.findOneAndUpdate({ _id: req.params.id }, { $set: { checkout_time: date } }, { new: true });
+
+    res.status(200).json(checkin_pass);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 //Admin Dump API
 app.get('/admin/dump', authenticateToken, async (req, res) => {
@@ -625,11 +779,13 @@ app.get('/admin/dump', authenticateToken, async (req, res) => {
     const allUsers = await User.find();
     const allVisitors = await Visitor.find();
     const allPasses = await Pass.find();
+    const allresident = await Resident.find();
 
     res.status(200).json({
       Users: allUsers,
       Visitors: allVisitors,
       Visitor_Passes: allPasses,
+      Resident: allresident
     });
   } catch (error) {
     console.error(error.message);
@@ -652,7 +808,7 @@ app.post('/admin/read/:collections', authenticateToken, async (req, res) => {
     const filters = req.body;
 
     // Validate the requested collections
-    const validcollections = ['User', 'Visitor', 'Visitor_Pass'];
+    const validcollections = ['User', 'Visitor', 'Visitor_Pass','Resident'];
     if (!collections || !validcollections.includes(collections)) {
       return res.status(400).send('Invalid or missing collections parameter');
     }
@@ -665,6 +821,8 @@ app.post('/admin/read/:collections', authenticateToken, async (req, res) => {
       queryResult = await Visitor.find(filters);
     } else if (collections === 'Visitor_Pass') {
       queryResult = await Pass.find(filters);
+    } else if (collections === 'Resident') {
+      queryResult = await Resident.find(filters);
     }
 
     res.status(200).json(queryResult);
@@ -689,7 +847,7 @@ app.post('/admin/update/:id', authenticateToken, async (req, res) => {
     const doc_id = req.params.id
 
     // Validate the requested collections
-    const validcollections = ['User', 'Visitor', 'Visitor_Pass'];
+    const validcollections = ['User', 'Visitor', 'Visitor_Pass','Resident'];
     if (!collections || !validcollections.includes(collections)) {
       return res.status(400).send('Invalid or missing collections parameter');
     }
@@ -708,6 +866,8 @@ app.post('/admin/update/:id', authenticateToken, async (req, res) => {
       updateresult = await Visitor.findOneAndUpdate({_id: doc_id},update,{new: true});
     } else if (collections === 'Visitor_Pass') {
       updateresult = await Pass.findOneAndUpdate({_id: doc_id},update,{new: true});
+    } else if (collections === 'Resident') {
+      updateresult = await Resident.findOneAndUpdate({_id: doc_id},update,{new: true});
     }
 
     res.status(200).json(updateresult);
@@ -721,26 +881,28 @@ app.post('/admin/update/:id', authenticateToken, async (req, res) => {
 //admin delete a user and all his visitor and visitor_pass documents
 app.delete('/admin/delete/all/user/:id', authenticateToken, async (req, res) => {
   try {
+    // Check if the logged-in user is an admin
     const loggedInUser = await User.findOne({ _id: req.user.user_id });
-
-    // Check user's authentication and admin role
     if (!loggedInUser || loggedInUser.login_status !== true || loggedInUser.role !== 'admin') {
       return res.status(403).send('Unauthorized: Admin access only');
     }
 
+    // Find and delete the user based on the provided ID
     const deletedUser = await User.findByIdAndDelete(req.params.id);
 
+    // If the user is not found, return a 404 response
     if (!deletedUser) {
       return res.status(404).send('User not found');
     }
 
-    // Get the visitor ID from the deleted user
-    const visitorId = deletedUser.visitor_id;
+    // Get the visitor IDs from the deleted user
+    const visitorIds = deletedUser.visitor_id;
 
-    // Delete related data in other collections based on the visitor ID
-    await Visitor.deleteMany({ _id: visitorId });
-    await Pass.deleteMany({ visitor_id: visitorId });
+    // Delete related data in other collections based on the visitor IDs
+    await Visitor.deleteMany({ _id: { $in: visitorIds } });
+    await Pass.deleteMany({ visitor_id: { $in: visitorIds } });
 
+    // Send a successful response
     res.status(200).json({ message: 'User and associated data deleted successfully' });
   } catch (error) {
     console.error(error.message);
@@ -748,3 +910,37 @@ app.delete('/admin/delete/all/user/:id', authenticateToken, async (req, res) => 
   }
 });
 
+
+//admin delete a visitor and visitor_pass documents
+app.delete('/admin/delete/visitor/:id', authenticateToken, async (req, res) => {
+  try {
+    const loggedInUser = await User.findOne({ _id: req.user.user_id });
+
+    // Check user's authentication and admin role
+    if (!loggedInUser || loggedInUser.login_status !== true || loggedInUser.role !== 'admin') {
+      return res.status(403).send('Unauthorized: Admin access only');
+    }
+
+    // Find and delete the visitor based on the provided ID
+    const deletedv = await Visitor.findByIdAndDelete(req.params.id);
+
+    // If the visitor is not found, return a 404 response
+    if (!deletedv) {
+      return res.status(404).send('visitor not found');
+    }
+    // Get the visitor pass IDs from the deleted visitor
+    const passIds = deletedv.visitor_pass_id;
+    await Pass.deleteMany({ _id: { $in: passIds } });
+
+    // Remove the deleted visitor's ID from the user's visitor_id array
+    await User.updateOne(
+      { _id: deletedv.user_id },
+      { $pull: { visitor_id: req.params.id } }
+    );
+
+    res.status(200).json({ message: 'Visitor and associated data deleted successfully' });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});

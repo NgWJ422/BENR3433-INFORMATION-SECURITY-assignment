@@ -15,13 +15,13 @@
  * @swagger
  * /test/register:
  *  post:
- *      summary: admin registration for penetration testing
+ *      summary: registration api for penetration testing,Only 3 role(admin,security, and user)
  *      tags:
  *        - test
- *      description: Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
+ *      description: Only 3 role(admin,security, and user),Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *      requestBody:
  *          required: true
- *          description: Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
+ *          description: Only 3 role(admin,security, and user). Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *          content:
  *              application/json:
  *                  schema:
@@ -577,7 +577,7 @@
  * @swagger
  *  /security/pass/hp/{id}:
  *    get:
- *      summary: Get visitor pass details by ID
+ *      summary: Retrieves the phone number of the visitor associated with the specified pass ID.
  *      description: Retrieves the phone number of the visitor associated with the specified pass ID.
  *      tags:
  *        - Security

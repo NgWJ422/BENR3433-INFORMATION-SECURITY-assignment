@@ -90,16 +90,34 @@ const options = {
   app.use('/swagger', swaggerUi.serve, swaggerUi.setup(openapiSpecification));
 
 
-mongoose.connect(process.env.mongo_url)
- .then(()=>{
-     console.log('connected to mongodb')
-     app.listen(port,() => {
-         console.log(`Node Api is running on port ${port}`)
-     })
- }).catch((error)=>{
-     console.log(error)
- })
+//connect using password
 
+// mongoose.connect(process.env.mongo_url)
+//  .then(()=>{
+//      console.log('connected to mongodb')
+//      app.listen(port,() => {
+//          console.log(`Node Api is running on port ${port}`)
+//      })
+//  }).catch((error)=>{
+//      console.log(error)
+//  })
+
+//connect using X509 cert
+const url = process.env.mongo_x509_url;
+mongoose.connect(url, {
+  tls: true,
+  // location of a local .pem file that contains both the client's certificate and key
+  tlsCertificateKeyFile: 'X509-cert-4070599474815490296.pem',
+  authMechanism: 'MONGODB-X509',
+  authSource: '$external',
+}).then(()=>{
+       console.log('connected to mongodb through X509 ceritificate')
+       app.listen(port,() => {
+           console.log(`Node Api is running on port ${port}`)
+       })
+   }).catch((error)=>{
+       console.log(error)
+   })
 
 
 app.get('/', (req, res) => {

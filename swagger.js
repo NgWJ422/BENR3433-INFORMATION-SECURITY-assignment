@@ -18,10 +18,10 @@
  *      summary: admin registration for penetration testing
  *      tags:
  *        - test
- *      description: Password must have minimum 8 characters.
+ *      description: Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *      requestBody:
  *          required: true
- *          description: Password must have minimum 8 characters.
+ *          description: Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *          content:
  *              application/json:
  *                  schema:
@@ -48,7 +48,7 @@
  *                          user:
  *                              $ref: '#components/schemas/registersuccessful'
  *          400:
- *              description: Invalid password. Please follow the password policy. Password must have minimum 8 characters.
+ *              description: Invalid password. Please follow the password policy. Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *          409:
  *              description: Username has been taken
  *          500:
@@ -72,10 +72,10 @@
  *      summary: registration for new users requiring security approval
  *      tags:
  *        - User
- *      description: this api fetch data from mongodb. Password must have minimum 8 characters.
+ *      description: this api fetch data from mongodb. Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *      requestBody:
  *          required: true
- *          description: Password must have minimum 8 characters.
+ *          description: Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *          content:
  *              application/json:
  *                  schema:
@@ -91,7 +91,7 @@
  *                          user:
  *                              $ref: '#components/schemas/registersuccessful'
  *          400:
- *              description: Invalid password. Please follow the password policy.
+ *              description: Invalid password. Please follow the password policy.Password requirements= At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]
  *          409:
  *              description: Username has been taken
  *          500:

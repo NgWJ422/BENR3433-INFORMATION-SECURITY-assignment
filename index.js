@@ -40,7 +40,7 @@ app.use(limiter);
 
 const validatePassword = (password) => {
   // Minimum 8 characters
-  const passwordRegex = /^.{8,}$/;
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d!@#$%^&*()_+]{8,}$/;
 
   return passwordRegex.test(password);
 };
@@ -56,7 +56,7 @@ const options = {
         version: '1.0.0',
       },
       tags:[
-        { name: 'test', description: 'testing endpoints' },
+        { name: 'test', description: 'testing endpoints(for penetration testing)' },
         { name: 'Resident', description: 'Create residents(for admin only)' },
         { name: 'User', description: 'Endpoints related to users' },
         { name: 'Visitor', description: 'Endpoints related to visitor' },
@@ -139,7 +139,7 @@ app.get('/', (req, res) => {
     }
 
     if (!validatePassword(req.body.password)) {
-      return res.status(400).send('Invalid password. Please follow the password policy.');
+      return res.status(400).send('Invalid password. Please follow the password policy.Password requirements: At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]');
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -173,7 +173,7 @@ app.post('/register', async(req, res) => {
         const a = await User.findOne({'username':req.body.username})
         console.log('Received Password:', password); 
         if (!validatePassword(password)) {
-          return res.status(400).send('Invalid password. Please follow the password policy.');
+          return res.status(400).send('Invalid password. Please follow the password policy.Password requirements: At least 8 characters, including one lowercase letter, one uppercase letter, one digit, and one special character from the set [!@#$%^&*()_+]');
         }
 
 

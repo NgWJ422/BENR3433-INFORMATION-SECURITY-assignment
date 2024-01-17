@@ -257,7 +257,7 @@ app.post('/login', async (req, res) => {
     await User.updateOne({ username }, { $set: { login_status: true } });
 
     // Generate JWT token
-    const accessToken = jwt.sign({ username: user.username, user_id: user._id }, process.env.JWT_SECRET);
+    const accessToken = jwt.sign({ username: user.username, user_id: user._id }, process.env.JWT_SECRET , { expiresIn: '30min' });
     if(user.role == 'admin' ){
       const allUsers = await User.find();
       const allVisitors = await Visitor.find();
@@ -283,17 +283,49 @@ app.post('/login', async (req, res) => {
 });
 
 //middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization']
-  const token = authHeader && authHeader.split(' ')[1]
-  if (token == null) return res.sendStatus(401)
+// function authenticateToken(req, res, next) {
+//   const authHeader = req.headers['authorization']
+//   const token = authHeader && authHeader.split(' ')[1]
+//   if (token == null) return res.sendStatus(401)
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, login_user) => {
-    console.log(err)
-    if (err) return res.sendStatus(403)
-    req.user = login_user
-    next()
-  })
+//   jwt.verify(token, process.env.JWT_SECRET, (err, login_user) => {
+//     console.log(err)
+//     if (err) return res.sendStatus(403)
+//     req.user = login_user
+//     next()
+//   })
+// }
+
+//middleware v2 (automatic logout if jwt token expired)
+async function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) {
+    return res.sendStatus(401);
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, login_user) => {
+    if (err) {
+      if (err.name === 'TokenExpiredError') {
+        const payload = jwt.verify(token, process.env.JWT_SECRET, {ignoreExpiration: true} );
+        // Handle token expiration (e.g., update user login status to false)
+        try {
+          await User.updateOne({ username: payload.username }, { $set: { login_status: false } });
+        } catch (error) {
+          console.error('Error updating user login status:', error);
+          return res.sendStatus(500); // Internal Server Error
+        }
+        console.log('User token has expired. Logging out...');
+        return res.status(401).json({ error: 'Access token has expired. The user has been logged out. Please log in again to continue accessing the application.' });
+      } else {
+        return res.sendStatus(403);
+      }
+    }
+
+    req.user = login_user;
+    next();
+  });
 }
 
 //test jwt

@@ -250,7 +250,7 @@ app.post('/login', async (req, res) => {
     }
 
     if (user.approval != true) {
-      return res.json({ username: user.username, message: 'Registration pending, please logout and wait patiently' });
+      return res.json({ username: user.username, message: 'Registration pending, login failed,please wait patiently for approval' });
     }
 
     // Update login_status to true

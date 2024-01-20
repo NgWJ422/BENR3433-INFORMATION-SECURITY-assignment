@@ -71,7 +71,7 @@ const options = {
                 scheme: "bearer",
                 bearerFormat: "JWT",
                 value: "Bearer <JWT token here>",
-                description:"this is for authentication only, to log out, please use the logout api. Logout here won't log you out of the account"
+                description:"JWT token will expired in 30 minutes after it has been generated since login. Sending API with expired JWT will cause user to log out immediately. This is for authentication only, to log out, please use the logout api. Logout here won't log you out of the account"
             }
           }
         },

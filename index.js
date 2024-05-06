@@ -16,7 +16,7 @@ const validator = require('validator');
 
 
 const port = process.env.PORT || 3000;
-
+const mongoDB_X509_cert= 'X509-cert-7390001086999426750.pem'
 
 
 app.use(express.json())
@@ -102,12 +102,12 @@ const options = {
 //      console.log(error)
 //  })
 
-//connect using X509 cert
+//connect using X509 cert 
 const url = process.env.mongo_x509_url;
 mongoose.connect(url, {
   tls: true,
   // location of a local .pem file that contains both the client's certificate and key
-  tlsCertificateKeyFile: 'X509-cert-4070599474815490296.pem',
+  tlsCertificateKeyFile: mongoDB_X509_cert,
   authMechanism: 'MONGODB-X509',
   authSource: '$external',
 }).then(()=>{

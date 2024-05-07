@@ -6,3 +6,5 @@ every one can only be registered as user
 the role of admin will a given by me straight away through mongodb database, not through swagger.
 I will select a user and change his/her role into admin straight away!
 ![Alt text](image-1.png)
+
+https://benr3433-information-security-assignment.azurewebsites.net/swagger/
